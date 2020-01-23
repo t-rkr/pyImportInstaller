@@ -21,9 +21,7 @@ class WALKER(ast.NodeVisitor):
 
     def visit_Import(self, node):
         """
-
-        :param node:
-        :return:
+        Get all the imports
         """
         for alias in node.names:
             # print(alias.__dict__)
@@ -32,9 +30,7 @@ class WALKER(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node):
         """
-
-        :param node:
-        :return:
+        Get all the 'from' imports
         """
         for alias in node.names:
             # print(node.module)
@@ -43,17 +39,16 @@ class WALKER(ast.NodeVisitor):
 
     def report(self):
         """
-
-        :return:
+        Convert the output to a list
         """
         return list(set(self.stats))
 
 
 def get_imports(tree):
     """
-
-    :param tree:
-    :return:
+    Walk the given ast to extract all the imports used.
+    :param tree: abstrax synta tree of a file
+    :return: list of all imports used in the tree
     """
     source_walker = WALKER()
     source_walker.visit(tree)
@@ -62,9 +57,9 @@ def get_imports(tree):
 
 def process_file(filename):
     """
-
-    :param filename:
-    :return:
+    Parse given python file and get the parsed ast.
+    :param filename: name of the python file to be read
+    :return: parsed abstract syntax tree
     """
     # Not checking existance of file because it was already checked previously.
     parsed_source = None
@@ -75,20 +70,26 @@ def process_file(filename):
 
 def process_dir(dir_path):
     """
-
-    :param dir_path:
-    :return:
+    Iterate through directories and sub-directories and capture all python files
+    :param dir_path: root path
+    :return: list of file paths of .py files
     """
     # Read all files that have the extension .py
     py_files = []
     for (dirpath, dirnames, filenames) in os.walk(dir_path):
-
         for file in filenames:
             if file.endswith('.py'):
                 file_path = "{0}\{1}".format(dirpath, file)
                 py_files.append(file_path)
     return py_files
 
+def remove_stopwords(imports):
+    my_stopwords = ["app","config","tests"]
+    clean_imports = [l.split('.')[0] for l in imports]
+    #clean_imports = [l.split('_')[0] for l in clean_imports]
+    clean_imports = [l for l in clean_imports if l not in my_stopwords]
+
+    return clean_imports
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.option('--file', '-f', help="File to read for imports")
@@ -100,37 +101,42 @@ def main(file, dir):
     """
     LOGGER.setLevel(logging.DEBUG)
     LOGGER.debug("Debugger")
+    user_dir_imports = []
+    used_file_imports=[]
     if file:
         if os.path.isfile(file):
             sourced_file = process_file(file)
             used_file_imports = get_imports(sourced_file)
             print(used_file_imports)
-
         else:
             print("Invalid filename or  File does not exist.")
     elif dir:
         if os.path.isdir(dir):
             py_files = process_dir(dir)
-            user_dir_imports = []
             if py_files:
-                print(py_files)
+                #print(py_files)
                 for py_file in py_files:
-                    print(py_file)
+                    #print(py_file)
                     try:
                         sourced_file = process_file(py_file)
                         used_file_imports = get_imports(sourced_file)
                         user_dir_imports = user_dir_imports + used_file_imports
                     except SyntaxError:
                         print("There was a problem reading: ",py_file)
-                print(list(set(user_dir_imports)))
+                #print(list(set(user_dir_imports)))
             else:
                 print("No .py files found!")
 
         else:
             print("Invalid directory name or  directory does not exist.")
     else:
-        print("No File/Directory specified! Please ")
-
+        print("No File/Directory specified! Please type the fullpath.")
+    all_imports = list(set(user_dir_imports))
+    #Some clean up before presenting the imports
+    all_imports = remove_stopwords(all_imports)
+    imports = "The following imports were used:\n {0}. \n You could use pip3 install -U [module_name] to install the " \
+              "dependencies.".format(", ".join(list(set(all_imports))))
+    print(imports)
 
 if __name__ == '__main__':
     try:
